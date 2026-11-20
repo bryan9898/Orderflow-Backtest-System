@@ -1,0 +1,13 @@
+# outputs (re-created by run_demo.py)
+out/
+# anything computed from real, licensed data: never share
+private_out/
+# raw market data
+*.dbn
+*.dbn.zst
+*.zst
+# credentials
+.env
+*.key
+__pycache__/
+*.pyc
