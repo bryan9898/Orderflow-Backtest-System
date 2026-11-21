@@ -16,22 +16,42 @@ The public demo runs on **synthetic** MBO data, so you can run it without a Data
 
 You need Python 3.10 or newer.
 
+**1. Fastest result (about 10 seconds):**
+
 ```bash
 pip install -r requirements.txt
-python -m ofbt build      # generates 8 synthetic sessions and rebuilds their books (about 1.5 minutes)
+python run_demo.py
+```
+
+This generates one synthetic session, rebuilds its order book, runs the demo rule with the fill model and controls, and writes **`out/report.html`**, which opens in your browser. The report is a single offline file: run details, results against the controls, a chart of every trade and a second-by-second replay of the book. If it does not open by itself, open `out/report.html`.
+
+**2. The tests:**
+
+```bash
+python -m ofbt build --sessions 1     # one synthetic session (about 10 s); the engine test needs it
+python tests/test_book.py             # book rebuild on hand-written messages with a known answer
+python tests/test_engine.py           # no look-ahead, and the engine matches the report's trades
+python tests/test_rolls.py            # the contract-roll case study (no session needed)
+```
+
+**3. The full app:**
+
+```bash
+python -m ofbt build      # 8 synthetic sessions (about 1.5 minutes; reuses any already built)
 python -m ofbt serve      # opens http://127.0.0.1:8765
 ```
 
 In the app, press **Run backtest**, then click any trade to see it on the chart or press **▶ replay** to watch it second by second. Press <kbd>Home</kbd> then <kbd>Space</kbd> to replay a session from the open. The **How it works** tab lists every control.
 
-Other ways in:
+From the terminal:
 
 ```bash
 python -m ofbt backtest delta_momentum                         # the same backtest in the terminal
 python -m ofbt backtest vwap_reversion --set z=2.5 stop_pts=6  # override parameters
-python run_demo.py                                             # one session -> one offline HTML report (no server)
-python tests/test_book.py && python tests/test_engine.py       # tests
+python -m ofbt rollcase                                        # the contract-roll case study, step by step
 ```
+
+**Troubleshooting case study:** [docs/case_study_roll.md](docs/case_study_roll.md) works through a real 294.50-point futures roll mismatch between two data sources: the symptom, why a price-gap check missed it, how comparing the sources found it, and the fix, reproduced on synthetic data.
 
 ## What the app shows
 
@@ -189,6 +209,7 @@ The code that loads the data is `ofbt/loaders.py`, `load_dbn()`. It uses `databe
    - size at the best bid and best ask equal on 7,200 of 7,200 seconds;
    - the tape matched to the contract: 230,711 trades, 300,147 contracts, and 152,171 contracts bought by aggressors in both.
 6. **Reproducible:** seed 7 gives the same 778,083 messages and the same trades on every run.
+7. **Contract rolls:** `tests/test_rolls.py` reproduces the roll case study on synthetic data. A gap screen misses the hidden switch, the source comparison finds it, the spread comes out at exactly 294.50, and after back-adjustment the two sources agree to the tick.
 
 ## Limitations
 
@@ -197,7 +218,7 @@ The code that loads the data is `ofbt/loaders.py`, `load_dbn()`. It uses `databe
 - **Once-a-second sampling.** Decisions and exits happen at second boundaries; order inside a second is approximated (stop first). The tape keeps every print with its millisecond time, but the book is sampled once a second.
 - **Depth heatmap:** 50 ticks either side of the mid; sizes above 65,535 are capped.
 - **Timestamps:** the book uses `ts_recv`, Databento's receive time, not `ts_event`. Real latency to an exchange and to a trading platform is not modelled.
-- **Contract rolls:** `NQ.v.0` switches contracts on the roll. A multi-day study must not compare prices across a roll without adjusting them, and should drop roll days.
+- **Contract rolls:** `NQ.v.0` switches contracts on the roll. Backtests here run one session at a time, so they are not affected, but a multi-day study must not compare prices across a roll without adjusting them. Each session records its `instrument_id`, and `ofbt/rolls.py` has the tools; see [the case study](docs/case_study_roll.md).
 - **Statistics:** 8 two-hour sessions are few. A sweep over many settings will always find a cell that looks good on the training sessions; the held-out test is the honest number, and it is still small. A real study needs many more days, and the settings must be chosen on one period and confirmed once on another.
 - **Single user, local:** the server binds to 127.0.0.1 and runs user strategy files as normal Python code. It is not built to be exposed to a network.
 
@@ -214,14 +235,15 @@ ofbt/engine.py          Strategy base class, event loop, controls, backtest_run(
 ofbt/strategies.py      built-in example strategies + the registry (loads user_strategies/)
 ofbt/metrics.py         statistics, equity curve, session bootstrap
 ofbt/backtest.py        the fill model (shared by everything)
+ofbt/rolls.py           contract-roll tools (switch detection, source comparison, spread, back-adjustment) + the case study
 ofbt/server.py          local HTTP server and JSON / binary API
-ofbt/__main__.py        command line: build, serve, backtest, list
+ofbt/__main__.py        command line: build, serve, backtest, list, rollcase
 ofbt/rule.py, report.py the static one-session report used by run_demo.py
 web/                    the browser app (index.html, app.js, style.css)
 user_strategies/        your strategies; ema_cross.py is an example
-tests/                  book rebuild and engine tests
+tests/                  book rebuild, engine and roll tests
 run_demo.py             one command: synthetic static report, or --dbn for a real file
-docs/                   screenshots
+docs/                   screenshots and the roll case study
 ```
 
 ## Not in this repository, on purpose

@@ -43,6 +43,7 @@ def save(B, sid, info, private=False):
     card = dict(id=sid, private=private, tick=C.TICK, point_usd=C.POINT_USD, seconds=int(len(B["t"])), trades=int(len(B["tr_tk"])),
                 contracts=int(B["tr_sz"].sum()), records=int(B["records"]), start=t0.isoformat(), end=t1.isoformat(),
                 label=f"{t0:%a %d %b %Y} {t0:%H:%M}-{t1:%H:%M} NY", heat_half=book.HEAT,
+                instrument_id=int(B.get("instrument_id") or 0),   # which contract: needed to spot rolls across sessions
                 open=float(B["ba"][0] + B["bb"][0]) / 2 * C.TICK, **info)
     with open(os.path.join(d, sid + ".json"), "w") as f:
         json.dump(card, f, indent=1)

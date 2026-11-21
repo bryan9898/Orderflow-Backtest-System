@@ -6,6 +6,7 @@
     python -m ofbt serve [--port 8765] [--no-open]      the replay + backtest web app
     python -m ofbt backtest STRATEGY [--set k=v ...]    a backtest in the terminal on every built session
     python -m ofbt list                                 sessions and strategies
+    python -m ofbt rollcase                             the contract-roll case study, reproduced on synthetic data
 """
 import argparse
 import json
@@ -34,6 +35,7 @@ def main(argv=None):
     t.add_argument("--sessions", nargs="*")
     t.add_argument("--json", action="store_true")
     sub.add_parser("list")
+    sub.add_parser("rollcase")
     a = ap.parse_args(argv)
 
     if a.cmd == "build":
@@ -46,6 +48,9 @@ def main(argv=None):
     elif a.cmd == "serve":
         from .server import serve
         serve(a.host, a.port, not a.no_open)
+    elif a.cmd == "rollcase":
+        from . import rolls
+        rolls.run_case()
     elif a.cmd == "list":
         for c in store.list_sessions():
             print(f"session  {c['id']:28s} {c['label']}  {c['kind']}")

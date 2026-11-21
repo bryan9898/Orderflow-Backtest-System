@@ -1,4 +1,4 @@
-"""Engine checks on the built sessions (run `python -m ofbt build` first):
+"""Engine checks on the built sessions (run `python -m ofbt build --sessions 1` first):
   1. no look-ahead: every feature computed on a session cut at second k equals the full-session feature up to k
   2. parity: the engine running the default DeltaMomentum gives the same trades as the static report's rule,
      once the report's overlapping trades are removed (the engine holds one position at a time)
@@ -23,7 +23,10 @@ def cut(B, k):
 
 
 def main():
-    sid = store.list_sessions()[0]["id"]
+    sessions = [c for c in store.list_sessions() if not c["private"]]
+    if not sessions:
+        sys.exit("no sessions yet: run  python -m ofbt build --sessions 1  first (about 10 s)")
+    sid = sessions[0]["id"]
     B = store.load(sid)
     full = Features(B)
     for k in (700, 2500, 5000):
