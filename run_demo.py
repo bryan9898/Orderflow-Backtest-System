@@ -14,7 +14,7 @@ import webbrowser
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from demo import backtest, book, config as C, loaders, report, rule, synth
+from ofbt import backtest, book, config as C, loaders, report, rule, synth
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 NY = ZoneInfo("America/New_York")

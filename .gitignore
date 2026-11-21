@@ -11,3 +11,7 @@ private_out/
 *.key
 __pycache__/
 *.pyc
+# sessions built locally (python -m ofbt build)
+data/
+# sessions built from real, licensed data: never share
+private_data/

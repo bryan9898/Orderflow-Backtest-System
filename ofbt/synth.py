@@ -23,13 +23,14 @@ UNIT = int(round(C.TICK * C.PRICE_SCALE))
 NULL_PRICE = 9223372036854775807
 
 
-def generate(path, seed=C.SYNTH_SEED, minutes=C.SYNTH_MINUTES, rate=60.0, log=print):
+def generate(path, seed=C.SYNTH_SEED, minutes=C.SYNTH_MINUTES, rate=60.0, log=print, date=C.SYNTH_DATE,
+             start_ny=C.SYNTH_START_NY, start_price=C.SYNTH_START_PRICE):
     rng = random.Random(seed)
     ny = ZoneInfo("America/New_York")
-    t0 = datetime.fromisoformat(f"{C.SYNTH_DATE}T{C.SYNTH_START_NY}:00").replace(tzinfo=ny)
+    t0 = datetime.fromisoformat(f"{date}T{start_ny}:00").replace(tzinfo=ny)
     ns = int(t0.timestamp()) * 1_000_000_000
     end_ns = ns + minutes * 60 * 1_000_000_000
-    fair = C.SYNTH_START_PRICE / C.TICK          # in ticks, real-valued
+    fair = start_price / C.TICK          # in ticks, real-valued
 
     levels = ({}, {})                            # side (0 bid, 1 ask) -> {tick: [order ids, FIFO]}
     orders = {}                                  # oid -> [side, tick, size]
@@ -101,7 +102,7 @@ def generate(path, seed=C.SYNTH_SEED, minutes=C.SYNTH_MINUTES, rate=60.0, log=pr
 
     vol = 1.0
     ts = ns
-    step_sd = 2.0 / math.sqrt(rate)              # about 2 ticks a second in calm stretches
+    step_sd = 1.4 / math.sqrt(rate)              # about 1.4 ticks a second in calm stretches
     while ts < end_ns:
         ts += int(rng.expovariate(rate) * 1e9) + 1
         vol = 1.0 + 0.9995 * (vol - 1.0) + (rng.random() < 0.0004) * rng.uniform(1, 3)   # rare bursts that fade
@@ -131,12 +132,16 @@ def generate(path, seed=C.SYNTH_SEED, minutes=C.SYNTH_MINUTES, rate=60.0, log=pr
             emit(ts, "M", "BA"[s], tick, nq, oid)
         else:                                    # a random market order (noise)
             take(ts, rng.randint(0, 1), min(25, int(rng.paretovariate(1.8))))
-        for s in (0, 1):                         # never let a side run out
+        for s in (0, 1):                         # never let a side run out: fill the nearest empty price behind the inside
             while len(levels[s]) < 15:
-                quote(ts, s)
+                bst = best(s)
+                tick = (bst if bst is not None else math.floor(fair) + s) - (1 if s == 0 else -1) * (bst is not None)
+                while tick in levels[s]:
+                    tick += -1 if s == 0 else 1
+                add(ts, s, tick, rng.choice((1, 2, 3, 5)))
 
     with gzip.open(path, "wt", newline="") as f:
         f.write("ts_recv,ts_event,instrument_id,order_id,price,size,flags,action,side,sequence\n")
         f.write("\n".join(rows)); f.write("\n")
-    log(f"synthetic MBO written: {len(rows):,} messages, {minutes} minutes from {C.SYNTH_DATE} {C.SYNTH_START_NY} New York -> {path}")
+    log(f"synthetic MBO written: {len(rows):,} messages, {minutes} minutes from {date} {start_ny} New York -> {path}")
     return path

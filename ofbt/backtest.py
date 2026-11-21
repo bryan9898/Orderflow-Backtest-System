@@ -17,16 +17,20 @@ import numpy as np
 from . import config as C
 
 
-def simulate(B, s, side):
+def simulate(B, s, side, stop_pts=None, target_pts=None, max_hold=None, end=None):
+    """One bracket trade decided at the end of second s. Returns the trade dict, or None if it cannot be placed."""
+    stop_pts = C.STOP_PTS if stop_pts is None else stop_pts
+    target_pts = C.TARGET_PTS if target_pts is None else target_pts
+    max_hold = C.MAX_HOLD_S if max_hold is None else max_hold
     tk = C.TICK
-    n = len(B["t"])
+    n = len(B["t"]) if end is None else min(end, len(B["t"]))
     e = s + 1
     if e >= n or B["bb"][e] < 0 or B["ba"][e] < 0:
         return None
     entry = int(B["ba"][e] if side == 1 else B["bb"][e])
-    stop = entry - side * int(round(C.STOP_PTS / tk))
-    tgt = entry + side * int(round(C.TARGET_PTS / tk))
-    last = min(n - 1, e + C.MAX_HOLD_S)
+    stop = entry - side * int(round(stop_pts / tk))
+    tgt = entry + side * int(round(target_pts / tk))
+    last = min(n - 1, e + max_hold)
     for j in range(e + 1, last + 1):
         if side == 1:
             hit_s = B["lo_b"][j] <= stop
@@ -35,19 +39,19 @@ def simulate(B, s, side):
             hit_s = B["hi_a"][j] >= stop
             hit_t = B["lo_a"][j] <= tgt - C.TARGET_THROUGH_TICKS
         if hit_s:
-            return _res(B, s, side, entry, stop, tgt, j, stop - side * C.STOP_SLIP_TICKS, "stop")
+            return _res(B, s, side, entry, stop, tgt, j, stop - side * C.STOP_SLIP_TICKS, "stop", stop_pts)
         if hit_t:
-            return _res(B, s, side, entry, stop, tgt, j, tgt, "target")
+            return _res(B, s, side, entry, stop, tgt, j, tgt, "target", stop_pts)
     xp = int(B["bb"][last] if side == 1 else B["ba"][last])
-    return _res(B, s, side, entry, stop, tgt, last, xp, "time")
+    return _res(B, s, side, entry, stop, tgt, last, xp, "time" if last == e + max_hold else "session end", stop_pts)
 
 
-def _res(B, s, side, entry, stop, tgt, j, xp, how):
+def _res(B, s, side, entry, stop, tgt, j, xp, how, stop_pts):
     tk = C.TICK
     pts = (xp - entry) * side * tk - C.COST_PTS
     return dict(sig_s=s, e_s=s + 1, x_s=j, t_entry=int(B["t"][s + 1]), t_exit=int(B["t"][j]), side=side,
                 entry=entry * tk, stop=stop * tk, target=tgt * tk, exit=xp * tk, how=how,
-                pts=round(pts, 2), R=round(pts / C.STOP_PTS, 3), usd=round(pts * C.POINT_USD, 2))
+                pts=round(pts, 2), R=round(pts / stop_pts, 3), usd=round(pts * C.POINT_USD, 2))
 
 
 def stats(T):

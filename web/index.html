@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Order-Flow Replay Lab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">OFBT <span>replay + backtest</span></div>
+    <select id="session" title="Session"></select>
+    <span class="tag" id="kind"></span>
+    <div class="sep"></div>
+    <div class="seg" id="tf" title="Bar size">
+      <button data-tf="1">1s</button><button data-tf="5">5s</button><button data-tf="15">15s</button><button data-tf="60" class="on">1m</button><button data-tf="300">5m</button>
+    </div>
+    <div class="sep"></div>
+    <label class="chk"><input type="checkbox" id="optHeat" checked> Depth heatmap</label>
+    <label class="chk"><input type="checkbox" id="optVwap" checked> VWAP</label>
+    <label class="chk"><input type="checkbox" id="optBub" checked> Large prints</label>
+    <label class="chk"><input type="checkbox" id="optTrades" checked> Trades</label>
+    <div class="grow"></div>
+    <span class="small" id="sessInfo"></span>
+    <button class="btn icon" id="theme" title="Light / dark">◐</button>
+  </header>
+
+  <div class="bar" id="replay">
+    <button class="btn icon" id="bStart" title="Start of session (Home)">⏮</button>
+    <button class="btn icon" id="bBack" title="Back one bar (Shift+←)">◀</button>
+    <button class="btn icon primary" id="bPlay" title="Play / pause (Space)">▶</button>
+    <button class="btn icon" id="bFwd" title="Forward one bar (Shift+→)">▶|</button>
+    <button class="btn icon" id="bEnd" title="Show the whole session (End)">⏭</button>
+    <select id="speed" title="Replay speed">
+      <option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10" selected>10×</option>
+      <option value="30">30×</option><option value="60">60×</option><option value="120">120×</option><option value="300">300×</option>
+    </select>
+    <span class="clock" id="clock">--:--:--</span>
+    <span class="tag" id="mode">full session</span>
+    <input type="range" id="slider" min="0" max="1" value="1" step="1" title="Replay position">
+    <label class="chk" title="Keep the replay cursor in view (F)"><input type="checkbox" id="follow" checked> Follow</label>
+    <div class="sep"></div>
+    <span class="small">Sim</span>
+    <input type="number" id="simStop" value="8" step="0.25" min="0.25" title="Sim stop (points)">
+    <input type="number" id="simTgt" value="16" step="0.25" min="0.25" title="Sim target (points)">
+    <button class="btn buy" id="simBuy" title="Buy at the next second's ask (B)">Buy</button>
+    <button class="btn sell" id="simSell" title="Sell at the next second's bid (S)">Sell</button>
+    <button class="btn" id="simFlat" title="Flatten at the current bid / ask (X)">Flat</button>
+    <span class="mono" id="simPnl"></span>
+  </div>
+
+  <main>
+    <div id="chartWrap"><canvas id="chart"></canvas><div id="tip"></div></div>
+    <aside id="side">
+      <div id="domBox"><div class="ph"><span>Depth of market</span><span id="domInfo" class="mono"></span></div><canvas id="dom"></canvas></div>
+      <div id="tsBox"><div class="ph"><span>Time &amp; sales</span><span id="tsInfo" class="mono"></span></div><div id="ts"></div></div>
+    </aside>
+  </main>
+
+  <div id="resizer" title="Drag to resize"></div>
+  <section id="bottom">
+    <nav class="tabs">
+      <button data-tab="strategy" class="on">Strategy</button><button data-tab="results">Results</button><button data-tab="trades">Trades</button>
+      <button data-tab="sweep">Sweep</button><button data-tab="sim">Sim log</button><button data-tab="help">How it works</button>
+      <span class="note" id="status"></span>
+    </nav>
+
+    <div class="pane on" id="p-strategy">
+      <div class="cols">
+        <div class="card">
+          <h3>Strategy</h3>
+          <select id="strat" style="width:100%"></select>
+          <p class="desc" id="stratDesc"></p>
+          <div class="params" id="params"></div>
+          <div class="row"><button class="btn primary" id="runBt">Run backtest</button><button class="btn" id="resetParams">Defaults</button><span class="small" id="btInfo"></span></div>
+        </div>
+        <div class="card">
+          <h3>Sessions</h3>
+          <div class="row" style="margin:0 0 6px"><button class="btn" id="sessAll">All</button><button class="btn" id="sessNone">None</button><button class="btn" id="sessCur">Current only</button></div>
+          <div class="sess" id="sessList"></div>
+          <p class="small">Fill model: enter in the next second at the ask (buy) or bid (sell); stop filled 1 tick worse; target needs 1 tick through; stop first if both hit in one second; costs <span id="costTxt"></span> pts a round turn. One position at a time.</p>
+        </div>
+        <div class="card">
+          <h3>Parameter sweep (walk-forward)</h3>
+          <div class="params" style="grid-template-columns:1fr 1fr">
+            <label>X parameter<select id="swX"></select></label><label>Y parameter<select id="swY"></select></label>
+            <label>X values<input type="text" id="swXv" placeholder="e.g. 4, 6, 8, 10"></label><label>Y values<input type="text" id="swYv" placeholder="e.g. 8, 12, 16"></label>
+            <label>Test on the last<input type="number" id="swTest" value="3" min="0" step="1"></label><label>Min trades (train)<input type="number" id="swMin" value="10" min="1" step="1"></label>
+          </div>
+          <p class="small">Every combination runs on the training sessions (the selected sessions minus the last ones). The best one is then scored once on the held-out test sessions.</p>
+          <div class="row"><button class="btn primary" id="runSw">Run sweep</button><span class="small" id="swInfo"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" id="p-results"><div class="empty">Run a backtest from the Strategy tab.</div></div>
+    <div class="pane" id="p-trades"><div class="empty">No trades yet.</div></div>
+    <div class="pane" id="p-sweep"><div class="empty">Run a sweep from the Strategy tab.</div></div>
+    <div class="pane" id="p-sim"><div class="empty">Replay a session and use Buy / Sell / Flat in the replay bar.</div></div>
+    <div class="pane" id="p-help">
+      <div class="grid2">
+        <div class="card">
+          <h3>What you are looking at</h3>
+          <p>Each session is a full order book rebuilt from market-by-order messages (every add, cancel, modify and trade, with order IDs), then sampled once a second. The chart shows the <b>depth heatmap</b> (resting size on every price, blue for bids and orange for offers, brighter is bigger), candles built from the tape, the session <b>VWAP</b>, <b>large prints</b> (seconds with unusually high traded volume, green when buyers were the aggressors), volume split by aggressor and cumulative delta.</p>
+          <p><b>Replay</b> hides everything after the replay cursor: the chart, the depth of market and time &amp; sales show only what was known at that second. Press <kbd>Home</kbd> then <kbd>Space</kbd> to replay from the open, or <kbd>Shift</kbd>-click the chart to start the replay at that time. While replaying, the Sim buttons trade with the same fill model as the backtester.</p>
+          <p><b>Backtests</b> run in Python (ofbt/engine.py). A strategy sees one second at a time and cannot read ahead (tests/test_engine.py checks it). Each result is compared with two controls: the opposite side at the same seconds, and the same brackets at random seconds. A strategy only matters if it beats both on many sessions; the 90% interval is a bootstrap over whole sessions.</p>
+          <p class="small">The sessions shipped with the demo are synthetic: a toy simulation, not market history. Sessions built from your own Databento files are stored under private_data/ and never leave your machine.</p>
+        </div>
+        <div class="card">
+          <h3>Controls</h3>
+          <table>
+            <tr><td><kbd>Space</kbd></td><td style="text-align:left">play / pause</td></tr>
+            <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td style="text-align:left">one second back / forward (<kbd>Shift</kbd>: one bar)</td></tr>
+            <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td style="text-align:left">start of session / whole session</td></tr>
+            <tr><td><kbd>+</kbd> <kbd>-</kbd></td><td style="text-align:left">faster / slower</td></tr>
+            <tr><td><kbd>F</kbd> <kbd>H</kbd></td><td style="text-align:left">follow cursor / heatmap on-off</td></tr>
+            <tr><td><kbd>B</kbd> <kbd>S</kbd> <kbd>X</kbd></td><td style="text-align:left">sim buy / sell / flatten (in replay)</td></tr>
+            <tr><td>wheel</td><td style="text-align:left">zoom time (on the price axis: zoom price)</td></tr>
+            <tr><td>drag</td><td style="text-align:left">pan (on the price axis: scale price)</td></tr>
+            <tr><td>double-click</td><td style="text-align:left">auto-fit</td></tr>
+            <tr><td><kbd>Shift</kbd>-click</td><td style="text-align:left">replay from that second</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+<div id="toast"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

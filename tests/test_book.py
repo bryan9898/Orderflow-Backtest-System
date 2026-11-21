@@ -2,8 +2,8 @@
 import os, sys
 import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from demo import book
-from demo.loaders import MBO_DTYPE
+from ofbt import book
+from ofbt.loaders import MBO_DTYPE
 
 U = 250_000_000                       # one 0.25 tick in Databento fixed-point price units
 S = 1_000_000_000                     # one second in ns
